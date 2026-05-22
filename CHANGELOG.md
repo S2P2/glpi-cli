@@ -17,7 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Token persistence at `~/.config/glpi-cli/config.json`
 - Auto-refresh expired tokens using refresh_token grant
 - Server URL and token resolved from config after login — no flags needed for subsequent commands
-- Test suite (vitest) — 7 tests covering config persistence, login flow, and token refresh
+- Pretty table output for list commands — aligned columns with header row
+  - Default columns match GLPI web UI display preferences per alias
+  - Fallback columns (`id, name, status, entity`) for uncured aliases
+  - Nested `{ id, name }` objects rendered as `id: name`
+  - Datetime values shortened to `YYYY-MM-DD HH:MM`
+  - Long values truncated to 25 chars with `…`
+  - Thai/CJK text alignment via `string-width` library
+- Detail view for single-item responses — key-value pairs
+- `--columns <a,b,c>` flag — show only specified fields (works with `--json` too)
+- `--no-header` flag — omit column headers for scripting
+- `render.ts` module with 21 tests
 
 ## [0.1.0] - 2026-05-22
 

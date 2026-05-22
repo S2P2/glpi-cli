@@ -65,6 +65,10 @@ Then run commands as normal:
 ```bash
 glpi computer list
 glpi ticket list --limit 10
+glpi computer list --columns id,name,serial    # Specific columns
+glpi computer list --no-header                 # Scripting-friendly
+glpi computer list --json --columns id,name    # Lean JSON for agents
+glpi computer get 123                          # Key-value detail view
 ```
 
 ## Commands
@@ -157,6 +161,8 @@ Every alias and raw command supports the same flags as the GLPI API:
 | `--bearer-token <token>` | OAuth2 bearer token (or `GLPI_TOKEN` env) |
 | `--oauth-token <token>` | Alias for `--bearer-token` |
 | `--json` | Machine-readable JSON output |
+| `--columns <a,b,c>` | Show only specified fields (works with `--json` too) |
+| `--no-header` | Omit column headers in list output |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |
 

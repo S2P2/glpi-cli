@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { login } from "./login.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { createInterface } from "node:readline";
+import { getDefaultColumns, renderList, renderDetail, filterColumns } from "./render.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SPEC_PATH = resolve(__dirname, "..", "openapi.json");
@@ -120,12 +121,16 @@ function extractGlobalOpts(flags: Record<string, string | string[]>) {
     (flags["oauth-token"] as string) ||
     process.env.GLPI_TOKEN;
   const json = flags.json === "true";
+  const columns = typeof flags.columns === "string" ? flags.columns.split(",").map(s => s.trim()) : undefined;
+  const noHeader = flags["no-header"] === "true";
   // Remove consumed keys from flags
   delete flags.server;
   delete flags["bearer-token"];
   delete flags["oauth-token"];
   delete flags.json;
-  return { server, bearerToken, json };
+  delete flags.columns;
+  delete flags["no-header"];
+  return { server, bearerToken, json, columns, noHeader };
 }
 
 // ── Main ────────────────────────────────────────────────────────────────
@@ -152,7 +157,7 @@ async function main() {
   }
 
   const { positional, flags } = parseArgs(argv);
-  const { server, bearerToken, json } = extractGlobalOpts(flags);
+  const { server, bearerToken, json, columns, noHeader } = extractGlobalOpts(flags);
 
   if (positional.length === 0) {
     printHelp();
@@ -186,7 +191,7 @@ async function main() {
 
     const specliAction = `${action}-${prefix}`;
     const result = await api.exec(resource, specliAction, actionArgs, coerceFlags(flags));
-    printResult(result, json);
+    printResult(result, json, first, columns, noHeader);
   } else {
     // Raw mode: glpi <resource> <action> [args...] [--flags...]
     const resource = positional[0];
@@ -200,21 +205,38 @@ async function main() {
     }
 
     const result = await api.exec(resource, action, actionArgs, coerceFlags(flags));
-    printResult(result, json);
+    printResult(result, json, undefined, columns, noHeader);
   }
 }
 
 import type { CommandResult } from "specli";
 
-function printResult(result: CommandResult, json: boolean) {
+function printResult(
+  result: CommandResult,
+  json: boolean,
+  alias?: string,
+  columns?: string[],
+  noHeader?: boolean
+) {
   if (json) {
-    console.log(JSON.stringify(result, null, 2));
+    if (isSuccess(result)) {
+      const body = result.response.body;
+      const output = columns ? filterColumns(body, columns) : body;
+      console.log(JSON.stringify(output, null, 2));
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
   } else if (isSuccess(result)) {
     const body = result.response.body;
     if (typeof body === "string") {
       console.log(body);
+    } else if (Array.isArray(body)) {
+      const cols = columns ?? getDefaultColumns(alias ?? "");
+      console.log(renderList(body, cols, { showHeader: !noHeader }));
+    } else if (typeof body === "object") {
+      console.log(renderDetail(body));
     } else {
-      console.log(JSON.stringify(body, null, 2));
+      console.log(body);
     }
   } else if (isError(result)) {
     console.error("error:", result.message);
@@ -377,6 +399,8 @@ GLOBAL OPTIONS
   --bearer-token <token>  OAuth2 bearer token (or GLPI_TOKEN env)
   --oauth-token <token>   Alias for --bearer-token
   --json                  Machine-readable JSON output
+  --columns <a,b,c>       Show only specified fields (works with --json too)
+  --no-header             Omit column headers in list output
   -h, --help              Show this help
   -v, --version           Show version
 
