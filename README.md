@@ -178,6 +178,10 @@ All prompted interactively if not provided. Sensitive fields are masked.
 | `--username <user>` | `GLPI_USERNAME` | GLPI username |
 | `--password <pass>` | `GLPI_PASSWORD` | GLPI password |
 
+## Agent Skills
+
+This repo includes a skill at `.agents/skills/glpi-cli/SKILL.md` that teaches AI coding agents (GitHub Copilot, Codex, Claude Code, Amp, etc.) how to use `glpi-cli`. Agents with skill support will discover it automatically.
+
 ## Profiles
 
 For managing multiple GLPI instances, use specli's built-in profile system:

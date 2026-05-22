@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--no-header` flag — omit column headers for scripting
 - `render.ts` module with 21 tests
 
+### Changed
+
+- Early project, intended for personal use. May have rough edges.
+
 ## [0.1.0] - 2026-05-22
 
 ### Added
