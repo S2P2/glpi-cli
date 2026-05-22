@@ -6,17 +6,17 @@ Built on [specli](https://github.com/vercel-labs/specli) — auto-generated from
 
 ## Install
 
-```bash
-npm install -g glpi-cli
-```
-
-Or run without installing:
+> Not yet published to npm. Install from source for now.
 
 ```bash
-npx glpi-cli computer list
+git clone https://github.com/S2P2/glpi-cli.git
+cd glpi-cli
+npm install
+npm run build
+npm link
 ```
 
-(After `glpi login`, no server or token flags needed.)
+Then `glpi` is available globally.
 
 ## Quick Start
 
