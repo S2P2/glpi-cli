@@ -1,6 +1,6 @@
 {
   "name": "glpi-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI for interacting with GLPI API",
   "type": "module",
   "main": "dist/index.js",
@@ -16,6 +16,8 @@
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "compile": "node scripts/compile.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -35,7 +37,8 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "tsx": "^4.22.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
   },
   "engines": {
     "node": ">=18"

@@ -13,8 +13,10 @@ npm install -g glpi-cli
 Or run without installing:
 
 ```bash
-npx glpi-cli computer list --server https://glpi.example.com/api.php --bearer-token xxx
+npx glpi-cli computer list
 ```
+
+(After `glpi login`, no server or token flags needed.)
 
 ## Quick Start
 
@@ -22,50 +24,45 @@ npx glpi-cli computer list --server https://glpi.example.com/api.php --bearer-to
 
 Go to **Setup → OAuth Clients**, create a client with the **api** scope. Note the **Client ID** and **Client Secret**.
 
-### 2. Get a token
+### 2. Login
 
 ```bash
-curl -X POST https://glpi.example.com/api.php/token \
-  -d "grant_type=password" \
-  -d "client_id=YOUR_CLIENT_ID" \
-  -d "client_secret=YOUR_CLIENT_SECRET" \
-  -d "username=YOUR_USERNAME" \
-  -d "password=YOUR_PASSWORD" \
-  -d "scope=api"
+glpi login
 ```
 
-Or in PowerShell:
+Follow the prompts — enter your server root URL (e.g. `https://glpi.example.com`), client ID, client secret, username, and password. Sensitive fields are masked.
 
-```powershell
-$response = Invoke-RestMethod -Uri "https://glpi.example.com/api.php/token" `
-  -Method POST `
-  -Body @{
-    grant_type    = "password"
-    client_id     = "YOUR_CLIENT_ID"
-    client_secret = "YOUR_CLIENT_SECRET"
-    username      = "YOUR_USERNAME"
-    password      = "YOUR_PASSWORD"
-    scope         = "api"
-  }
-$response.access_token
+All fields can also be passed as flags or env vars (no prompts):
+
+```bash
+# All via flags
+glpi login --server https://glpi.example.com --client-id ID --client-secret SECRET --username admin --password pass
+
+# All via env vars
+GLPI_SERVER=https://glpi.example.com GLPI_CLIENT_ID=ID GLPI_CLIENT_SECRET=SECRET GLPI_USERNAME=admin GLPI_PASSWORD=pass glpi login
 ```
 
-### 3. Set credentials and run
+Token is saved to `~/.config/glpi-cli/config.json` and auto-refreshed when expired.
 
-```powershell
+### 3. Run commands
+
+No need to set tokens manually after `glpi login`. The server URL and token are stored and auto-refreshed.
+
+For CI/scripting, you can still use env vars or flags:
+
+```bash
 # PowerShell
 $env:GLPI_SERVER = "https://glpi.example.com/api.php"
 $env:GLPI_TOKEN = "your-access-token"
 
-glpi computer list
-glpi ticket list --limit 10
-```
-
-```bash
 # Bash
 export GLPI_SERVER="https://glpi.example.com/api.php"
 export GLPI_TOKEN="your-access-token"
+```
 
+Then run commands as normal:
+
+```bash
 glpi computer list
 glpi ticket list --limit 10
 ```
@@ -162,6 +159,18 @@ Every alias and raw command supports the same flags as the GLPI API:
 | `--json` | Machine-readable JSON output |
 | `-h, --help` | Show help |
 | `-v, --version` | Show version |
+
+## Login Options
+
+All prompted interactively if not provided. Sensitive fields are masked.
+
+| Option | Env var | Description |
+|---|---|---|
+| `--server <url>` | `GLPI_SERVER` | GLPI root URL (e.g. `https://glpi.example.com`) |
+| `--client-id <id>` | `GLPI_CLIENT_ID` | OAuth2 client ID |
+| `--client-secret <secret>` | `GLPI_CLIENT_SECRET` | OAuth2 client secret |
+| `--username <user>` | `GLPI_USERNAME` | GLPI username |
+| `--password <pass>` | `GLPI_PASSWORD` | GLPI password |
 
 ## Profiles
 

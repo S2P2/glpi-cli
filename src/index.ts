@@ -12,6 +12,9 @@ import { specli, isSuccess, isError } from "specli";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { login } from "./login.js";
+import { loadConfig, saveConfig } from "./config.js";
+import { createInterface } from "node:readline";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SPEC_PATH = resolve(__dirname, "..", "openapi.json");
@@ -156,7 +159,16 @@ async function main() {
     process.exit(1);
   }
 
-  const api = await specli({ spec: SPEC_PATH, server, bearerToken });
+  // ── glpi login ─────────────────────────────────────────────────────
+  if (positional[0] === "login") {
+    await handleLogin(flags, server);
+    return;
+  }
+
+  // ── Resolve server + bearer token ───────────────────────────────
+  const { server: resolvedServer, token } = await resolveCredentials(server, bearerToken);
+
+  const api = await specli({ spec: SPEC_PATH, server: resolvedServer, bearerToken: token });
 
   const first = positional[0];
   const alias = ALIASES[first];
@@ -210,6 +222,126 @@ function printResult(result: CommandResult, json: boolean) {
   }
 }
 
+// ── Login command ────────────────────────────────────────────────────
+
+async function handleLogin(flags: Record<string, string | string[]>, serverOverride?: string) {
+  const server = serverOverride || (flags.server as string) || process.env.GLPI_SERVER;
+
+  try {
+    const serverRaw = serverOverride || process.env.GLPI_SERVER || (await ask("Server URL (e.g. https://glpi.example.com): "));
+    if (!serverRaw) {
+      console.error("error: server URL is required");
+      process.exit(1);
+    }
+    const server = normalizeServer(serverRaw);
+    const clientId = flags["client-id"] as string || process.env.GLPI_CLIENT_ID || (await ask("Client ID: "));
+    const clientSecret = flags["client-secret"] as string || process.env.GLPI_CLIENT_SECRET || (await askHidden("Client secret: "));
+    const username = flags.username as string || process.env.GLPI_USERNAME || (await ask("Username: "));
+    const password = flags.password as string || process.env.GLPI_PASSWORD || (await askHidden("Password: "));
+
+    const config = await login({
+      server,
+      clientId,
+      clientSecret,
+      username,
+      password,
+    });
+
+    console.log(`Logged in to ${config.server}`);
+    console.log(`Token expires at: ${new Date(config.expiresAt!).toISOString()}`);
+    process.stdin.pause();
+  } catch (err) {
+    console.error("error:", (err as Error).message);
+    process.exit(1);
+  }
+}
+
+function ask(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((res) =>
+    rl.question(question, (a) => { rl.close(); process.stdin.pause(); res(a); })
+  );
+}
+
+function normalizeServer(url: string): string {
+  let base = url.trim().replace(/\/+$/, "");
+  if (!base.endsWith("/api.php")) {
+    base += "/api.php";
+  }
+  return base;
+}
+
+function askHidden(prompt: string): Promise<string> {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    const stdout = process.stdout;
+
+    if (!stdin.isTTY) {
+      // Piped input — can't mask, just read a line
+      const rl = createInterface({ input: stdin });
+      rl.question("", (line) => { rl.close(); resolve(line); });
+      return;
+    }
+
+    stdout.write(prompt);
+    const wasRaw = stdin.isRaw;
+    stdin.resume();
+    stdin.setRawMode(true);
+    let buf = "";
+
+    const onData = (ch: Buffer) => {
+      for (const c of ch.toString()) {
+        if (c === "\n" || c === "\r") {
+          stdin.setRawMode(wasRaw ?? false);
+          stdin.removeListener("data", onData);
+          stdout.write("\n");
+          resolve(buf);
+          return;
+        } else if (c === "\u007f" || c === "\b") {
+          if (buf.length > 0) {
+            buf = buf.slice(0, -1);
+            stdout.write("\b \b"); // erase * on screen
+          }
+        } else if (c === "\u0003") {
+          // Ctrl+C
+          stdin.setRawMode(wasRaw ?? false);
+          stdin.removeListener("data", onData);
+          stdout.write("\n");
+          process.exit(130);
+        } else {
+          buf += c;
+          stdout.write("*");
+        }
+      }
+    };
+    stdin.on("data", onData);
+  });
+}
+
+async function resolveCredentials(serverOverride?: string, flagToken?: string): Promise<{ server?: string; token?: string }> {
+  // 1. Explicit flag or env var wins
+  if (flagToken) return { server: serverOverride, token: flagToken };
+
+  // 2. Load from config
+  const config = loadConfig();
+  if (!config?.accessToken) return { server: serverOverride };
+
+  const server = serverOverride || normalizeServer(config.server);
+
+  // 3. Auto-refresh if expired
+  if (config.expiresAt && config.expiresAt <= Date.now() && config.refreshToken) {
+    try {
+      const { refreshAccessToken } = await import("./login.js");
+      const refreshed = await refreshAccessToken();
+      return { server, token: refreshed?.accessToken };
+    } catch {
+      return { server, token: config.accessToken };
+    }
+  }
+
+  return { server, token: config.accessToken };
+}
+
 function printHelp() {
   const pkg = JSON.parse(
     readFileSync(resolve(__dirname, "..", "package.json"), "utf-8")
@@ -217,6 +349,7 @@ function printHelp() {
   console.log(`glpi v${pkg.version} — CLI for interacting with GLPI API
 
 USAGE
+  glpi login --server <url> --client-id <id>   OAuth2 login
   glpi <itemtype> <action> [id] [options]    Alias shortcut
   glpi <resource> <action> [args...] [options]  Raw specli command
 
@@ -248,7 +381,11 @@ GLOBAL OPTIONS
   -v, --version           Show version
 
 AUTH
-  Set your token via env:
+  Login once, then use glpi without passing tokens:
+    glpi login --server https://glpi.example.com/api.php --client-id YOUR_ID
+    glpi computer list              # uses saved token, auto-refreshes
+
+  Or set token via env for CI/scripting:
     Bash:   export GLPI_TOKEN=xxx
     PowerShell: $env:GLPI_TOKEN = "xxx"
   Or pass with every call: --bearer-token xxx
