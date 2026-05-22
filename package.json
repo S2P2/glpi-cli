@@ -1,0 +1,43 @@
+{
+  "name": "glpi-cli",
+  "version": "0.1.0",
+  "description": "CLI for interacting with GLPI API",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "glpi": "dist/index.js",
+    "glpi-cli": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "openapi.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "compile": "node scripts/compile.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "glpi",
+    "cli",
+    "glpi-project",
+    "api",
+    "itil",
+    "asset-management"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.3",
+    "specli": "^0.0.39"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
